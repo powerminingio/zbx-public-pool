@@ -300,6 +300,54 @@ zabbix_export:
           params: >
             last(//publicpool.network.difficulty)*4294967296/(last(//publicpool.infochart.latest.phs)*1e15)/86400
 
+
+  triggers:
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000701
+      name: "Public Pool API: /api/info unreachable or no data for 10m"
+      expression: 'nodata(/Template Public Pool API/publicpool.api.info.raw,10m)=1'
+      priority: HIGH
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000702
+      name: "Public Pool API: /api/network unreachable or no data for 15m"
+      expression: 'nodata(/Template Public Pool API/publicpool.api.network.raw,15m)=1'
+      priority: WARNING
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000703
+      name: "Public Pool API: hashrate chart data is stale (>30m)"
+      expression: '(now() - last(/Template Public Pool API/publicpool.infochart.latest.ts))>1800'
+      priority: HIGH
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
+      name: "Pool: total miners dropped >30% vs 1h average"
+      expression: 'last(/Template Public Pool API/publicpool.miners.total)<avg(/Template Public Pool API/publicpool.miners.total,1h)*0.7'
+      priority: WARNING
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000705
+      name: "Pool: total miners collapsed (>60% drop vs 2h average)"
+      expression: 'avg(/Template Public Pool API/publicpool.miners.total,2h)>20 and last(/Template Public Pool API/publicpool.miners.total)<avg(/Template Public Pool API/publicpool.miners.total,2h)*0.4'
+      priority: HIGH
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000706
+      name: "Pool: total hashrate dropped >40% vs 2h average"
+      expression: 'last(/Template Public Pool API/publicpool.hashrate.total)<avg(/Template Public Pool API/publicpool.hashrate.total,2h)*0.6'
+      priority: HIGH
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000707
+      name: "Pool: no new highscores for 48h"
+      expression: '(now() - last(/Template Public Pool API/publicpool.highscores.latest.ts))>172800'
+      priority: WARNING
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000708
+      name: "Pool backend restarted within last 10m"
+      expression: '(now() - last(/Template Public Pool API/publicpool.uptime.start.ts))<600'
+      priority: INFO
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000709
+      name: "Bitcoin network: wrong chain (not main)"
+      expression: 'last(/Template Public Pool API/publicpool.network.chain)<>"main"'
+      priority: DISASTER
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000710
+      name: "Bitcoin node: warnings present"
+      expression: 'last(/Template Public Pool API/publicpool.network.warnings.count)>0'
+      priority: WARNING
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000711
+      name: "Bitcoin node: block height not advancing for 2h"
+      expression: 'max(/Template Public Pool API/publicpool.network.blocks,2h)=min(/Template Public Pool API/publicpool.network.blocks,2h)'
+      priority: HIGH
+
+
   graphs:
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000502
       name: "Public-Pool Hashrate + Expected Time"
