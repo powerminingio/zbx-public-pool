@@ -16,6 +16,8 @@ zabbix_export:
       macros:
         - macro: "{$API_URL}"
           value: "http://localhost:3334"
+        - macro: "{$CHAIN_EXPECTED}"
+          value: "main"
 
       items:
         # =============================
@@ -335,8 +337,8 @@ zabbix_export:
       expression: '(now() - last(/Template Public Pool API/publicpool.uptime.start.ts))<600'
       priority: INFO
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000709
-      name: "Bitcoin network: wrong chain (not main)"
-      expression: 'last(/Template Public Pool API/publicpool.network.chain)<>"main"'
+      name: "Bitcoin network: chain mismatch"
+      expression: 'last(/Template Public Pool API/publicpool.network.chain)<>\"{$CHAIN_EXPECTED}\"'
       priority: DISASTER
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000710
       name: "Bitcoin node: warnings present"
