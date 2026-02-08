@@ -313,8 +313,8 @@ zabbix_export:
       expression: 'nodata(/Template Public Pool API/publicpool.api.network.raw,15m)=1'
       priority: WARNING
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000703
-      name: "Public Pool API: hashrate chart data is stale (>30m)"
-      expression: '(now() - last(/Template Public Pool API/publicpool.infochart.latest.ts))>1800'
+      name: "Public Pool API: hashrate chart data is stale (>60m)"
+      expression: '(avg(/Template Public Pool API/publicpool.hashrate.total,1h)>0) and ((now() - last(/Template Public Pool API/publicpool.infochart.latest.ts))>3600)'
       priority: HIGH
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
       name: "Pool: total miners dropped >30% vs 1h average"
