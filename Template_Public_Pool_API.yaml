@@ -9,7 +9,7 @@ zabbix_export:
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000002
       template: "Template Public Pool API"
       name: "Template Public Pool API"
-      description: "Monitors public-pool backend via HTTP API: /api/info, /api/network, /api/info/chart (no triggers)."
+      description: "Monitors public-pool backend via HTTP API: /api/info, /api/network, /api/info/chart (no triggers). Includes pool hashrate and expected time-to-find-block (years) on one graph."
       groups:
         - name: "Templates/Applications"
 
@@ -127,9 +127,9 @@ zabbix_export:
                   var j = JSON.parse(value);
                   var maxTs = 0;
                   (j.highScores || []).forEach(function(x){
-                    var s = (x.updatedAt || "").trim(); // "YYYY-MM-DD HH:MM:SS"
+                    var s = (x.updatedAt || "").trim();
                     if (!s) return;
-                    var iso = s.replace(" ", "T") + "Z"; // treat as UTC
+                    var iso = s.replace(" ", "T") + "Z";
                     var ts = Date.parse(iso);
                     if (!isNaN(ts)) {
                       ts = Math.floor(ts/1000);
@@ -223,7 +223,7 @@ zabbix_export:
         # DEPENDENT ITEMS from /api/info/chart
         # =============================
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000401
-          name: "Chart: latest value (last[].data)"
+          name: "Chart: latest value (H/s)"
           type: DEPENDENT
           key: publicpool.infochart.latest.value
           master_item:
@@ -255,3 +255,64 @@ zabbix_export:
                   if (!a.length) return null;
                   return Math.floor(Date.parse(a[a.length-1].label) / 1000);
 
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000403
+          name: "Public-Pool Hashrate (PH/s)"
+          type: DEPENDENT
+          key: publicpool.infochart.latest.phs
+          master_item:
+            key: publicpool.api.infochart.raw
+          value_type: FLOAT
+          units: "PH/s"
+          history: 30d
+          trends: 365d
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  if (!a.length) return null;
+                  var hs = Number(a[a.length-1].data);
+                  if (!isFinite(hs)) return null;
+                  return hs / 1e15;
+
+        # =============================
+        # CALCULATED conversion items
+        # =============================
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000601
+          name: "Expected time to find block (years)"
+          type: CALCULATED
+          key: publicpool.expected_time.years
+          value_type: FLOAT
+          units: "y"
+          history: 30d
+          trends: 365d
+          params: >
+            last(//publicpool.network.difficulty)*4294967296/(last(//publicpool.infochart.latest.phs)*1e15)/31557600
+
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000602
+          name: "Expected time to find block (days)"
+          type: CALCULATED
+          key: publicpool.expected_time.days
+          value_type: FLOAT
+          units: "d"
+          history: 30d
+          trends: 365d
+          params: >
+            last(//publicpool.network.difficulty)*4294967296/(last(//publicpool.infochart.latest.phs)*1e15)/86400
+
+  graphs:
+    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000502
+      name: "Public-Pool Hashrate + Expected Time"
+      graph_items:
+        - sortorder: "0"
+          color: "1A7C11"
+          item:
+            host: "Template Public Pool API"
+            key: publicpool.infochart.latest.phs
+
+        - sortorder: "1"
+          color: "0040FF"
+          yaxisside: RIGHT
+          item:
+            host: "Template Public Pool API"
+            key: publicpool.expected_time.years
