@@ -18,6 +18,10 @@ zabbix_export:
           value: "http://localhost:3334"
         - macro: "{$CHAIN_EXPECTED}"
           value: "main"
+        - macro: "{$HASHRATE_FLAT_THRESHOLD_REL}"
+          value: "0.03"
+        - macro: "{$HASHRATE_FLAT_THRESHOLD_ABS}"
+          value: "100000000"
 
       items:
         # =============================
@@ -313,9 +317,9 @@ zabbix_export:
       expression: 'nodata(/Template Public Pool API/publicpool.api.network.raw,15m)=1'
       priority: WARNING
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000703
-      name: "Public Pool API: hashrate chart data is stale (>60m)"
-      expression: '(avg(/Template Public Pool API/publicpool.hashrate.total,1h)>0) and ((now() - last(/Template Public Pool API/publicpool.infochart.latest.ts))>3600)'
-      priority: HIGH
+      name: "Public Pool API: hashrate not changing (relative; abs override)"
+      expression: '(avg(/Template Public Pool API/publicpool.hashrate.total,30m)>0) and (((avg(/Template Public Pool API/publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL})>={$HASHRATE_FLAT_THRESHOLD_ABS} and ((max(/Template Public Pool API/publicpool.infochart.latest.value,2h)-min(/Template Public Pool API/publicpool.infochart.latest.value,2h)) < (avg(/Template Public Pool API/publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL})))) or (((avg(/Template Public Pool API/publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL})<{$HASHRATE_FLAT_THRESHOLD_ABS} and ((max(/Template Public Pool API/publicpool.infochart.latest.value,2h)-min(/Template Public Pool API/publicpool.infochart.latest.value,2h)) < {$HASHRATE_FLAT_THRESHOLD_ABS}))))'
+      priority: WARNING
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
       name: "Pool: total miners dropped >30% vs 1h average"
       expression: 'last(/Template Public Pool API/publicpool.miners.total)<avg(/Template Public Pool API/publicpool.miners.total,1h)*0.7'
