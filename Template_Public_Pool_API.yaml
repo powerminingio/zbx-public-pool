@@ -332,10 +332,6 @@ zabbix_export:
       name: "Pool: total hashrate dropped >40% vs 2h average"
       expression: 'last(/Template Public Pool API/publicpool.hashrate.total)<avg(/Template Public Pool API/publicpool.hashrate.total,2h)*0.6'
       priority: HIGH
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000707
-      name: "Pool: no new highscores for 48h"
-      expression: '(now() - last(/Template Public Pool API/publicpool.highscores.latest.ts))>172800'
-      priority: WARNING
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000708
       name: "Pool backend restarted within last 10m"
       expression: '(now() - last(/Template Public Pool API/publicpool.uptime.start.ts))<600'
