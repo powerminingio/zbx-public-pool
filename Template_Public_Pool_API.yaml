@@ -306,6 +306,15 @@ zabbix_export:
           params: >
             last(//publicpool.network.difficulty)*4294967296/(last(//publicpool.infochart.latest.phs)*1e15)/86400
 
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000009901
+          name: "Hashrate flat threshold (H/s)"
+          type: CALCULATED
+          key: publicpool.hashrate.flat.threshold
+          value_type: FLOAT
+          units: "H/s"
+          params: 'max(avg(//publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL},{$HASHRATE_FLAT_THRESHOLD_ABS})'
+          history: 30d
+          trends: 365d
 
   triggers:
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000701
@@ -318,7 +327,7 @@ zabbix_export:
       priority: WARNING
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000703
       name: "Public Pool API: hashrate not changing (relative; abs override)"
-      expression: '(avg(/Template Public Pool API/publicpool.hashrate.total,30m)>0) and (((avg(/Template Public Pool API/publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL})>={$HASHRATE_FLAT_THRESHOLD_ABS} and ((max(/Template Public Pool API/publicpool.infochart.latest.value,2h)-min(/Template Public Pool API/publicpool.infochart.latest.value,2h)) < (avg(/Template Public Pool API/publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL})))) or (((avg(/Template Public Pool API/publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL})<{$HASHRATE_FLAT_THRESHOLD_ABS} and ((max(/Template Public Pool API/publicpool.infochart.latest.value,2h)-min(/Template Public Pool API/publicpool.infochart.latest.value,2h)) < {$HASHRATE_FLAT_THRESHOLD_ABS}))))'
+      expression: '(avg(/Template Public Pool API/publicpool.hashrate.total,30m)>0) and (max(/Template Public Pool API/publicpool.infochart.latest.value,2h) - min(/Template Public Pool API/publicpool.infochart.latest.value,2h)) < last(/Template Public Pool API/publicpool.hashrate.flat.threshold)'
       priority: WARNING
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
       name: "Pool: total miners dropped >30% vs 1h average"
@@ -338,7 +347,7 @@ zabbix_export:
       priority: INFO
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000709
       name: "Bitcoin network: chain mismatch"
-      expression: 'last(/Template Public Pool API/publicpool.network.chain)<>\"{$CHAIN_EXPECTED}\"'
+      expression: 'last(/Template Public Pool API/publicpool.network.chain)<>"{$CHAIN_EXPECTED}"'
       priority: DISASTER
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000710
       name: "Bitcoin node: warnings present"
