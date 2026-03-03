@@ -325,10 +325,6 @@ zabbix_export:
       name: "Public Pool API: /api/network unreachable or no data for 15m"
       expression: 'nodata(/Template Public Pool API/publicpool.api.network.raw,15m)=1'
       priority: WARNING
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000703
-      name: "Public Pool API: hashrate not changing (relative; abs override)"
-      expression: '(avg(/Template Public Pool API/publicpool.hashrate.total,30m)>0) and (max(/Template Public Pool API/publicpool.infochart.latest.value,2h) - min(/Template Public Pool API/publicpool.infochart.latest.value,2h)) < last(/Template Public Pool API/publicpool.hashrate.flat.threshold)'
-      priority: WARNING
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
       name: "Pool: total miners dropped >30% vs 1h average"
       expression: 'last(/Template Public Pool API/publicpool.miners.total)<avg(/Template Public Pool API/publicpool.miners.total,1h)*0.7'
