@@ -1,95 +1,82 @@
 zabbix_export:
-  version: "7.4"
-
+  version: '7.4'
   template_groups:
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000001
-      name: "Templates/Applications"
-
+    - uuid: 4abff66c37be497fb75bdce929c04e3e
+      name: Templates/Applications
   templates:
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000002
-      template: "Template Public Pool API"
-      name: "Template Public Pool API"
-      description: "Monitors public-pool backend via HTTP API: /api/info, /api/network, /api/info/chart (no triggers). Includes pool hashrate and expected time-to-find-block (years) on one graph."
+      template: 'Template Public Pool API'
+      name: 'Template Public Pool API'
+      description: 'Monitors public-pool backend via HTTP API: /api/info, /api/network, /api/info/chart (no triggers). Includes pool hashrate and expected time-to-find-block (years) on one graph.'
       groups:
-        - name: "Templates/Applications"
-
-      macros:
-        - macro: "{$API_URL}"
-          value: "http://localhost:3334"
-        - macro: "{$CHAIN_EXPECTED}"
-          value: "main"
-        - macro: "{$HASHRATE_FLAT_THRESHOLD_REL}"
-          value: "0.03"
-        - macro: "{$HASHRATE_FLAT_THRESHOLD_ABS}"
-          value: "100000000"
-
+        - name: Templates/Applications
       items:
-        # =============================
-        # MASTER ITEMS (HTTP agent)
-        # =============================
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000101
-          name: "Public Pool API: /api/info (raw)"
+          name: 'Public Pool API: /api/info (raw)'
           type: HTTP_AGENT
           key: publicpool.api.info.raw
-          url: "{$API_URL}/api/info"
-          request_method: GET
-          value_type: TEXT
           history: 1d
-          trends: "0"
-          delay: 1m
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000102
-          name: "Public Pool API: /api/network (raw)"
-          type: HTTP_AGENT
-          key: publicpool.api.network.raw
-          url: "{$API_URL}/api/network"
-          request_method: GET
           value_type: TEXT
-          history: 1d
-          trends: "0"
-          delay: 5m
-
+          url: '{$API_URL}/api/info'
+          triggers:
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000701
+              expression: 'nodata(/Template Public Pool API/publicpool.api.info.raw,{$NODATA})=1'
+              name: 'Public Pool API: /api/info unreachable or no data for {$NODATA}'
+              priority: HIGH
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000103
-          name: "Public Pool API: /api/info/chart (raw)"
+          name: 'Public Pool API: /api/info/chart (raw)'
           type: HTTP_AGENT
           key: publicpool.api.infochart.raw
-          url: "{$API_URL}/api/info/chart"
-          request_method: GET
-          value_type: TEXT
-          history: 1d
-          trends: "0"
           delay: 10m
-
-        # =============================
-        # DEPENDENT ITEMS from /api/info
-        # =============================
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000201
-          name: "Pool: total miners (sum userAgents[].count)"
-          type: DEPENDENT
-          key: publicpool.miners.total
-          master_item:
-            key: publicpool.api.info.raw
-          value_type: UNSIGNED
-          history: 7d
-          trends: 365d
-          preprocessing:
-            - type: JAVASCRIPT
-              parameters:
-                - |
-                  var j = JSON.parse(value);
-                  var sum = 0;
-                  (j.userAgents || []).forEach(function(x){ sum += Number(x.count || 0); });
-                  return sum;
-
+          history: 1d
+          value_type: TEXT
+          url: '{$API_URL}/api/info/chart'
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000102
+          name: 'Public Pool API: /api/network (raw)'
+          type: HTTP_AGENT
+          key: publicpool.api.network.raw
+          delay: 5m
+          history: 1d
+          value_type: TEXT
+          url: '{$API_URL}/api/network'
+          triggers:
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000702
+              expression: 'nodata(/Template Public Pool API/publicpool.api.network.raw,{$NODATA})=1'
+              name: 'Public Pool API: /api/network unreachable or no data for {$NODATA}'
+              priority: WARNING
+              dependencies:
+                - name: 'Public Pool API: /api/info unreachable or no data for {$NODATA}'
+                  expression: 'nodata(/Template Public Pool API/publicpool.api.info.raw,{$NODATA})=1'
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000602
+          name: 'Expected time to find block (days)'
+          type: CALCULATED
+          key: publicpool.expected_time.days
+          history: 30d
+          value_type: FLOAT
+          units: d
+          params: 'last(//publicpool.network.difficulty)*4294967296/(last(//publicpool.infochart.latest.phs)*1e15)/86400'
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000601
+          name: 'Expected time to find block (years)'
+          type: CALCULATED
+          key: publicpool.expected_time.years
+          history: 30d
+          value_type: FLOAT
+          units: 'y'
+          params: 'last(//publicpool.network.difficulty)*4294967296/(last(//publicpool.infochart.latest.phs)*1e15)/31557600'
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000009901
+          name: 'Hashrate flat threshold (H/s)'
+          type: CALCULATED
+          key: publicpool.hashrate.flat.threshold
+          history: 30d
+          value_type: FLOAT
+          units: H/s
+          params: 'max(avg(//publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL},{$HASHRATE_FLAT_THRESHOLD_ABS})'
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000202
-          name: "Pool: total hashrate (sum userAgents[].totalHashRate)"
+          name: 'Pool: total hashrate (sum userAgents[].totalHashRate)'
           type: DEPENDENT
           key: publicpool.hashrate.total
-          master_item:
-            key: publicpool.api.info.raw
-          value_type: FLOAT
           history: 7d
-          trends: 365d
+          value_type: FLOAT
           preprocessing:
             - type: JAVASCRIPT
               parameters:
@@ -98,34 +85,18 @@ zabbix_export:
                   var sum = 0;
                   (j.userAgents || []).forEach(function(x){ sum += Number(x.totalHashRate || 0); });
                   return sum;
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000203
-          name: "Pool: uptime start (epoch)"
-          type: DEPENDENT
-          key: publicpool.uptime.start.ts
           master_item:
             key: publicpool.api.info.raw
-          value_type: UNSIGNED
-          history: 30d
-          trends: 365d
-          preprocessing:
-            - type: JAVASCRIPT
-              parameters:
-                - |
-                  var j = JSON.parse(value);
-                  var ts = Date.parse(j.uptime);
-                  if (isNaN(ts)) return null;
-                  return Math.floor(ts / 1000);
-
+          triggers:
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000706
+              expression: 'count(/Template Public Pool API/publicpool.hashrate.total,10m)>=5 and avg(/Template Public Pool API/publicpool.hashrate.total,5m)<avg(/Template Public Pool API/publicpool.hashrate.total,2h)*0.6'
+              name: 'Pool: total hashrate dropped >40% vs 2h average'
+              priority: HIGH
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000204
-          name: "Pool: highscores latest updatedAt (epoch, max over array)"
+          name: 'Pool: highscores latest updatedAt (epoch, max over array)'
           type: DEPENDENT
           key: publicpool.highscores.latest.ts
-          master_item:
-            key: publicpool.api.info.raw
-          value_type: UNSIGNED
           history: 30d
-          trends: 365d
           preprocessing:
             - type: JAVASCRIPT
               parameters:
@@ -143,134 +114,15 @@ zabbix_export:
                     }
                   });
                   return maxTs || null;
-
-        # =============================
-        # DEPENDENT ITEMS from /api/network
-        # =============================
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000301
-          name: "Network: blocks"
-          type: DEPENDENT
-          key: publicpool.network.blocks
           master_item:
-            key: publicpool.api.network.raw
-          value_type: UNSIGNED
-          history: 30d
-          trends: 365d
-          preprocessing:
-            - type: JSONPATH
-              parameters: [ "$.blocks" ]
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000302
-          name: "Network: difficulty"
-          type: DEPENDENT
-          key: publicpool.network.difficulty
-          master_item:
-            key: publicpool.api.network.raw
-          value_type: FLOAT
-          history: 30d
-          trends: 365d
-          preprocessing:
-            - type: JSONPATH
-              parameters: [ "$.difficulty" ]
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000303
-          name: "Network: networkhashps"
-          type: DEPENDENT
-          key: publicpool.network.hashps
-          master_item:
-            key: publicpool.api.network.raw
-          value_type: FLOAT
-          history: 30d
-          trends: 365d
-          preprocessing:
-            - type: JSONPATH
-              parameters: [ "$.networkhashps" ]
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000304
-          name: "Network: pooledtx"
-          type: DEPENDENT
-          key: publicpool.network.pooledtx
-          master_item:
-            key: publicpool.api.network.raw
-          value_type: UNSIGNED
-          history: 30d
-          trends: 365d
-          preprocessing:
-            - type: JSONPATH
-              parameters: [ "$.pooledtx" ]
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000305
-          name: "Network: chain"
-          type: DEPENDENT
-          key: publicpool.network.chain
-          master_item:
-            key: publicpool.api.network.raw
-          value_type: TEXT
-          history: 30d
-          trends: "0"
-          preprocessing:
-            - type: JSONPATH
-              parameters: [ "$.chain" ]
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000306
-          name: "Network: warnings count"
-          type: DEPENDENT
-          key: publicpool.network.warnings.count
-          master_item:
-            key: publicpool.api.network.raw
-          value_type: UNSIGNED
-          history: 30d
-          trends: 365d
-          preprocessing:
-            - type: JSONPATH
-              parameters: [ "$.warnings.length()" ]
-
-        # =============================
-        # DEPENDENT ITEMS from /api/info/chart
-        # =============================
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000401
-          name: "Chart: latest value (H/s)"
-          type: DEPENDENT
-          key: publicpool.infochart.latest.value
-          master_item:
-            key: publicpool.api.infochart.raw
-          value_type: FLOAT
-          history: 30d
-          trends: 365d
-          preprocessing:
-            - type: JAVASCRIPT
-              parameters:
-                - |
-                  var a = JSON.parse(value);
-                  return a.length ? Number(a[a.length-1].data) : null;
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000402
-          name: "Chart: latest timestamp (epoch, last[].label)"
-          type: DEPENDENT
-          key: publicpool.infochart.latest.ts
-          master_item:
-            key: publicpool.api.infochart.raw
-          value_type: UNSIGNED
-          history: 30d
-          trends: 365d
-          preprocessing:
-            - type: JAVASCRIPT
-              parameters:
-                - |
-                  var a = JSON.parse(value);
-                  if (!a.length) return null;
-                  return Math.floor(Date.parse(a[a.length-1].label) / 1000);
-
+            key: publicpool.api.info.raw
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000403
-          name: "Public-Pool Hashrate (PH/s)"
+          name: 'Public-Pool Hashrate (PH/s)'
           type: DEPENDENT
           key: publicpool.infochart.latest.phs
-          master_item:
-            key: publicpool.api.infochart.raw
-          value_type: FLOAT
-          units: "PH/s"
           history: 30d
-          trends: 365d
+          value_type: FLOAT
+          units: PH/s
           preprocessing:
             - type: JAVASCRIPT
               parameters:
@@ -280,94 +132,192 @@ zabbix_export:
                   var hs = Number(a[a.length-1].data);
                   if (!isFinite(hs)) return null;
                   return hs / 1e15;
-
-        # =============================
-        # CALCULATED conversion items
-        # =============================
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000601
-          name: "Expected time to find block (years)"
-          type: CALCULATED
-          key: publicpool.expected_time.years
-          value_type: FLOAT
-          units: "y"
+          master_item:
+            key: publicpool.api.infochart.raw
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000402
+          name: 'Chart: latest timestamp (epoch, last[].label)'
+          type: DEPENDENT
+          key: publicpool.infochart.latest.ts
           history: 30d
-          trends: 365d
-          params: >
-            last(//publicpool.network.difficulty)*4294967296/(last(//publicpool.infochart.latest.phs)*1e15)/31557600
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000602
-          name: "Expected time to find block (days)"
-          type: CALCULATED
-          key: publicpool.expected_time.days
-          value_type: FLOAT
-          units: "d"
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  if (!a.length) return null;
+                  return Math.floor(Date.parse(a[a.length-1].label) / 1000);
+          master_item:
+            key: publicpool.api.infochart.raw
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000401
+          name: 'Chart: latest value (H/s)'
+          type: DEPENDENT
+          key: publicpool.infochart.latest.value
           history: 30d
-          trends: 365d
-          params: >
-            last(//publicpool.network.difficulty)*4294967296/(last(//publicpool.infochart.latest.phs)*1e15)/86400
-
-        - uuid: 3a2d8d3f6a4f4d3e9b3a000000009901
-          name: "Hashrate flat threshold (H/s)"
-          type: CALCULATED
-          key: publicpool.hashrate.flat.threshold
           value_type: FLOAT
-          units: "H/s"
-          params: 'max(avg(//publicpool.infochart.latest.value,2h)*{$HASHRATE_FLAT_THRESHOLD_REL},{$HASHRATE_FLAT_THRESHOLD_ABS})'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  return a.length ? Number(a[a.length-1].data) : null;
+          master_item:
+            key: publicpool.api.infochart.raw
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000201
+          name: 'Pool: total miners (sum userAgents[].count)'
+          type: DEPENDENT
+          key: publicpool.miners.total
+          history: 7d
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var j = JSON.parse(value);
+                  var sum = 0;
+                  (j.userAgents || []).forEach(function(x){ sum += Number(x.count || 0); });
+                  return sum;
+          master_item:
+            key: publicpool.api.info.raw
+          triggers:
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000705
+              expression: 'avg(/Template Public Pool API/publicpool.miners.total,2h)>20 and count(/Template Public Pool API/publicpool.miners.total,10m)>=5 and avg(/Template Public Pool API/publicpool.miners.total,5m)<avg(/Template Public Pool API/publicpool.miners.total,2h)*0.4'
+              name: 'Pool: total miners collapsed (>60% drop vs 2h average)'
+              priority: HIGH
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
+              expression: 'count(/Template Public Pool API/publicpool.miners.total,10m)>=5 and avg(/Template Public Pool API/publicpool.miners.total,5m)<avg(/Template Public Pool API/publicpool.miners.total,1h)*0.7'
+              name: 'Pool: total miners dropped >30% vs 1h average'
+              priority: WARNING
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000301
+          name: 'Network: blocks'
+          type: DEPENDENT
+          key: publicpool.network.blocks
           history: 30d
-          trends: 365d
-
-  triggers:
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000701
-      name: "Public Pool API: /api/info unreachable or no data for 10m"
-      expression: 'nodata(/Template Public Pool API/publicpool.api.info.raw,10m)=1'
-      priority: HIGH
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000702
-      name: "Public Pool API: /api/network unreachable or no data for 15m"
-      expression: 'nodata(/Template Public Pool API/publicpool.api.network.raw,15m)=1'
-      priority: WARNING
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
-      name: "Pool: total miners dropped >30% vs 1h average"
-      expression: 'last(/Template Public Pool API/publicpool.miners.total)<avg(/Template Public Pool API/publicpool.miners.total,1h)*0.7'
-      priority: WARNING
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000705
-      name: "Pool: total miners collapsed (>60% drop vs 2h average)"
-      expression: 'avg(/Template Public Pool API/publicpool.miners.total,2h)>20 and last(/Template Public Pool API/publicpool.miners.total)<avg(/Template Public Pool API/publicpool.miners.total,2h)*0.4'
-      priority: HIGH
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000706
-      name: "Pool: total hashrate dropped >40% vs 2h average"
-      expression: 'last(/Template Public Pool API/publicpool.hashrate.total)<avg(/Template Public Pool API/publicpool.hashrate.total,2h)*0.6'
-      priority: HIGH
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000708
-      name: "Pool backend restarted within last 10m"
-      expression: '(now() - last(/Template Public Pool API/publicpool.uptime.start.ts))<600'
-      priority: INFO
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000709
-      name: "Bitcoin network: chain mismatch"
-      expression: 'last(/Template Public Pool API/publicpool.network.chain)<>"{$CHAIN_EXPECTED}"'
-      priority: DISASTER
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000710
-      name: "Bitcoin node: warnings present"
-      expression: 'last(/Template Public Pool API/publicpool.network.warnings.count)>0'
-      priority: WARNING
-    - uuid: 3a2d8d3f6a4f4d3e9b3a000000000711
-      name: "Bitcoin node: block height not advancing for 2h"
-      expression: 'max(/Template Public Pool API/publicpool.network.blocks,2h)=min(/Template Public Pool API/publicpool.network.blocks,2h)'
-      priority: HIGH
-
-
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.blocks
+          master_item:
+            key: publicpool.api.network.raw
+          triggers:
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000711
+              expression: 'max(/Template Public Pool API/publicpool.network.blocks,2h)=min(/Template Public Pool API/publicpool.network.blocks,2h)'
+              name: 'Bitcoin node: block height not advancing for 2h'
+              priority: HIGH
+              dependencies:
+                - name: 'Public Pool API: /api/network unreachable or no data for {$NODATA}'
+                  expression: 'nodata(/Template Public Pool API/publicpool.api.network.raw,{$NODATA})=1'
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000305
+          name: 'Network: chain'
+          type: DEPENDENT
+          key: publicpool.network.chain
+          history: 30d
+          value_type: TEXT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.chain
+          master_item:
+            key: publicpool.api.network.raw
+          triggers:
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000709
+              expression: 'last(/Template Public Pool API/publicpool.network.chain)<>"{$CHAIN_EXPECTED}"'
+              name: 'Bitcoin network: chain mismatch'
+              priority: DISASTER
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000302
+          name: 'Network: difficulty'
+          type: DEPENDENT
+          key: publicpool.network.difficulty
+          history: 30d
+          value_type: FLOAT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.difficulty
+          master_item:
+            key: publicpool.api.network.raw
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000303
+          name: 'Network: networkhashps'
+          type: DEPENDENT
+          key: publicpool.network.hashps
+          history: 30d
+          value_type: FLOAT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.networkhashps
+          master_item:
+            key: publicpool.api.network.raw
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000304
+          name: 'Network: pooledtx'
+          type: DEPENDENT
+          key: publicpool.network.pooledtx
+          history: 30d
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.pooledtx
+          master_item:
+            key: publicpool.api.network.raw
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000306
+          name: 'Network: warnings count'
+          type: DEPENDENT
+          key: publicpool.network.warnings.count
+          history: 30d
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.warnings.length()
+          master_item:
+            key: publicpool.api.network.raw
+          triggers:
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000710
+              expression: 'last(/Template Public Pool API/publicpool.network.warnings.count)>0'
+              name: 'Bitcoin node: warnings present'
+              priority: WARNING
+              dependencies:
+                - name: 'Public Pool API: /api/network unreachable or no data for {$NODATA}'
+                  expression: 'nodata(/Template Public Pool API/publicpool.api.network.raw,{$NODATA})=1'
+        - uuid: 3a2d8d3f6a4f4d3e9b3a000000000203
+          name: 'Pool: uptime start (epoch)'
+          type: DEPENDENT
+          key: publicpool.uptime.start.ts
+          history: 30d
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var j = JSON.parse(value);
+                  var ts = Date.parse(j.uptime);
+                  if (isNaN(ts)) return null;
+                  return Math.floor(ts / 1000);
+          master_item:
+            key: publicpool.api.info.raw
+          triggers:
+            - uuid: 3a2d8d3f6a4f4d3e9b3a000000000708
+              expression: '(now() - last(/Template Public Pool API/publicpool.uptime.start.ts))<600'
+              name: 'Pool backend restarted within last 10m'
+              priority: INFO
+      macros:
+        - macro: '{$API_URL}'
+          value: 'http://localhost:3334'
+        - macro: '{$CHAIN_EXPECTED}'
+          value: main
+        - macro: '{$HASHRATE_FLAT_THRESHOLD_ABS}'
+          value: '100000000'
+        - macro: '{$HASHRATE_FLAT_THRESHOLD_REL}'
+          value: '0.03'
+        - macro: '{$NODATA}'
+          value: 10m
   graphs:
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000502
-      name: "Public-Pool Hashrate + Expected Time"
+      name: 'Public-Pool Hashrate + Expected Time'
       graph_items:
-        - sortorder: "0"
-          color: "1A7C11"
+        - color: 1A7C11
           item:
-            host: "Template Public Pool API"
+            host: 'Template Public Pool API'
             key: publicpool.infochart.latest.phs
-
-        - sortorder: "1"
-          color: "0040FF"
+        - sortorder: '1'
+          color: 0040FF
           yaxisside: RIGHT
           item:
-            host: "Template Public Pool API"
+            host: 'Template Public Pool API'
             key: publicpool.expected_time.years
