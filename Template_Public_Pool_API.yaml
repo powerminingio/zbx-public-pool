@@ -89,9 +89,9 @@ zabbix_export:
             key: publicpool.api.info.raw
           triggers:
             - uuid: 3a2d8d3f6a4f4d3e9b3a000000000706
-              expression: 'count(/Template Public Pool API/publicpool.hashrate.total,10m)>=5 and avg(/Template Public Pool API/publicpool.hashrate.total,5m)<avg(/Template Public Pool API/publicpool.hashrate.total,2h)*0.6'
-              name: 'Pool: total hashrate dropped >40% vs 2h average'
-              priority: HIGH
+              expression: 'count(/Template Public Pool API/publicpool.hashrate.total,10m)>=5 and avg(/Template Public Pool API/publicpool.hashrate.total,5m)<avg(/Template Public Pool API/publicpool.hashrate.total,2h)*0.95'
+              name: 'Pool: total hashrate dropped >5% vs 2h average'
+              priority: INFO
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000204
           name: 'Pool: highscores latest updatedAt (epoch, max over array)'
           type: DEPENDENT
