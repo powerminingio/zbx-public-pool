@@ -296,6 +296,117 @@ zabbix_export:
               expression: '(now() - last(/Template Public Pool API/publicpool.uptime.start.ts))<600'
               name: 'Pool backend restarted within last 10m'
               priority: INFO
+      discovery_rules:
+        - uuid: fd0e0164ca5045fe85b8f6bb11156dfc
+          name: 'User agent discovery'
+          type: DEPENDENT
+          key: publicpool.useragent.discovery
+          description: 'Discovers every userAgent returned by /api/info and creates per-user-agent miner count, hashrate and best-difficulty items.'
+          item_prototypes:
+            - uuid: e5d8a9b553e643fc900115f6cc755cd4
+              name: 'User agent {#UA}: connected miners'
+              type: DEPENDENT
+              key: 'publicpool.useragent.miners[{#UAKEY}]'
+              history: 7d
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var j = JSON.parse(value);
+                      var ua = {#UA_JSON};
+                      var list = j.userAgents || [];
+                      for (var i = 0; i < list.length; i++) {
+                          if (String(list[i].userAgent) === ua) {
+                              return Number(list[i].count || 0);
+                          }
+                      }
+                      return 0;
+              master_item:
+                key: publicpool.api.info.raw
+            - uuid: e70124da2839406b8641c7c7cc3cd393
+              name: 'User agent {#UA}: hashrate'
+              type: DEPENDENT
+              key: 'publicpool.useragent.hashrate[{#UAKEY}]'
+              history: 7d
+              value_type: FLOAT
+              units: H/s
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var j = JSON.parse(value);
+                      var ua = {#UA_JSON};
+                      var list = j.userAgents || [];
+                      for (var i = 0; i < list.length; i++) {
+                          if (String(list[i].userAgent) === ua) {
+                              return Number(list[i].totalHashRate || 0);
+                          }
+                      }
+                      return 0;
+              master_item:
+                key: publicpool.api.info.raw
+            - uuid: 8e500b1527744a9db7133b0e64e35985
+              name: 'User agent {#UA}: best difficulty'
+              type: DEPENDENT
+              key: 'publicpool.useragent.best_difficulty[{#UAKEY}]'
+              history: 30d
+              value_type: FLOAT
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var j = JSON.parse(value);
+                      var ua = {#UA_JSON};
+                      var list = j.userAgents || [];
+                      for (var i = 0; i < list.length; i++) {
+                          if (String(list[i].userAgent) === ua) {
+                              return Number(list[i].bestDifficulty || 0);
+                          }
+                      }
+                      return 0;
+              master_item:
+                key: publicpool.api.info.raw
+          master_item:
+            key: publicpool.api.info.raw
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var j = JSON.parse(value);
+                  var result = [];
+                  var list = j.userAgents || [];
+
+                  for (var i = 0; i < list.length; i++) {
+                      if (list[i].userAgent === null || list[i].userAgent === undefined) {
+                          continue;
+                      }
+
+                      var ua = String(list[i].userAgent);
+                      if (ua.length === 0) {
+                          continue;
+                      }
+
+                      // Item keys use a hex-encoded identifier so arbitrary user-agent
+                      // characters do not make the generated Zabbix item key invalid.
+                      var key = '';
+                      for (var n = 0; n < ua.length; n++) {
+                          var hex = ua.charCodeAt(n).toString(16);
+                          key += ('0000' + hex).slice(-4);
+                      }
+
+                      result.push({
+                          '{#UA}': ua,
+                          '{#UAKEY}': key,
+                          // A JSON string literal is safe to substitute directly into the
+                          // JavaScript preprocessing of dependent item prototypes.
+                          '{#UA_JSON}': JSON.stringify(ua)
+                      });
+                  }
+
+                  return JSON.stringify(result);
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
       macros:
         - macro: '{$API_URL}'
           value: 'http://localhost:3334'
