@@ -89,8 +89,8 @@ zabbix_export:
             key: publicpool.api.info.raw
           triggers:
             - uuid: 3a2d8d3f6a4f4d3e9b3a000000000706
-              expression: 'count(/Template Public Pool API/publicpool.hashrate.total,10m)>=5 and avg(/Template Public Pool API/publicpool.hashrate.total,5m)<avg(/Template Public Pool API/publicpool.hashrate.total,2h)*0.95'
-              name: 'Pool: total hashrate dropped >5% vs 2h average'
+              expression: 'count(/Template Public Pool API/publicpool.hashrate.total,10m)>=5 and avg(/Template Public Pool API/publicpool.hashrate.total,5m)<avg(/Template Public Pool API/publicpool.hashrate.total,{$DROP_BASELINE_WINDOW})*(100-{$HASHRATE_DROP_THRESHOLD_PCT})/100'
+              name: 'Pool: total hashrate dropped >{$HASHRATE_DROP_THRESHOLD_PCT}% vs {$DROP_BASELINE_WINDOW} average'
               priority: INFO
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000204
           name: 'Pool: highscores latest updatedAt (epoch, max over array)'
@@ -183,8 +183,8 @@ zabbix_export:
               name: 'Pool: total miners collapsed (>60% drop vs 2h average)'
               priority: HIGH
             - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
-              expression: 'count(/Template Public Pool API/publicpool.miners.total,10m)>=5 and avg(/Template Public Pool API/publicpool.miners.total,5m)<avg(/Template Public Pool API/publicpool.miners.total,1h)*0.7'
-              name: 'Pool: total miners dropped >30% vs 1h average'
+              expression: 'count(/Template Public Pool API/publicpool.miners.total,10m)>=5 and avg(/Template Public Pool API/publicpool.miners.total,5m)<avg(/Template Public Pool API/publicpool.miners.total,{$DROP_BASELINE_WINDOW})*(100-{$MINERS_DROP_THRESHOLD_PCT})/100'
+              name: 'Pool: total miners dropped >{$MINERS_DROP_THRESHOLD_PCT}% vs {$DROP_BASELINE_WINDOW} average'
               priority: WARNING
         - uuid: 3a2d8d3f6a4f4d3e9b3a000000000301
           name: 'Network: blocks'
@@ -418,6 +418,12 @@ zabbix_export:
           value: '0.03'
         - macro: '{$NODATA}'
           value: 10m
+        - macro: '{$MINERS_DROP_THRESHOLD_PCT}'
+          value: '30'
+        - macro: '{$HASHRATE_DROP_THRESHOLD_PCT}'
+          value: '5'
+        - macro: '{$DROP_BASELINE_WINDOW}'
+          value: 2h
   graphs:
     - uuid: 3a2d8d3f6a4f4d3e9b3a000000000502
       name: 'Public-Pool Hashrate + Expected Time'
