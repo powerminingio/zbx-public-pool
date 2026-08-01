@@ -39,6 +39,7 @@ All other metrics are derived using **dependent**, **calculated**, and
 | `{$HASHRATE_FLAT_THRESHOLD_REL}` | `0.03` | Relative hashrate variation threshold; `0.03` means 3% |
 | `{$HASHRATE_FLAT_THRESHOLD_ABS}` | `100000000` | Absolute minimum hashrate variation threshold in H/s; default is 100 MH/s |
 | `{$MINERS_DROP_THRESHOLD_PCT}` | `30` | Miner-count drop percentage required to trigger the relative drop alert |
+| `{$MINERS_COLLAPSE_THRESHOLD_PCT}` | `60` | Severe miner-count collapse percentage required to trigger the high-severity alert |
 | `{$HASHRATE_DROP_THRESHOLD_PCT}` | `5` | Pool-hashrate drop percentage required to trigger the relative drop alert |
 | `{$DROP_BASELINE_WINDOW}` | `2h` | Shared historical baseline window used by the miner-count and hashrate drop triggers |
 
@@ -51,7 +52,8 @@ The miner-count and total-hashrate drop triggers compare a recent
 
 Default behavior:
 
-- Miner-count alert: more than **30%** below the **2-hour** baseline
+- Miner-count warning: more than **30%** below the **2-hour** baseline
+- Miner-count collapse alert: more than **60%** below the **2-hour** baseline, when the baseline is above 20 miners
 - Hashrate alert: more than **5%** below the **2-hour** baseline
 
 For example, changing:
@@ -173,7 +175,7 @@ data in Zabbix.
 
 - Hashrate not changing beyond the configured relative/absolute threshold
 - Total miners dropped by more than `{$MINERS_DROP_THRESHOLD_PCT}` percent versus the `{$DROP_BASELINE_WINDOW}` average
-- Total miners collapsed by more than 60% versus the 2-hour average, with a minimum-baseline guard
+- Total miners collapsed by more than `{$MINERS_COLLAPSE_THRESHOLD_PCT}` percent versus the `{$DROP_BASELINE_WINDOW}` average, with a minimum-baseline guard
 - Total hashrate dropped by more than `{$HASHRATE_DROP_THRESHOLD_PCT}` percent versus the `{$DROP_BASELINE_WINDOW}` average
 - Backend restarted within the last 10 minutes
 
@@ -207,7 +209,7 @@ No Zabbix agent is required on the pool host for these HTTP checks.
 
 - Reuses HTTP master items through dependent items and LLD
 - Discovers user-agent categories automatically
-- Uses configurable percentage thresholds instead of fixed values
+- Uses configurable percentages for miner drops, severe miner collapse, and hashrate drops
 - Uses one shared, configurable baseline window for related drop checks
 - Uses guarded comparisons to reduce short-term alert noise
 - Avoids unreliable highscore-inactivity and overly aggressive chart-freshness alerts

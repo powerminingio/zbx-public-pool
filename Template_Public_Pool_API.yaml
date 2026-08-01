@@ -179,8 +179,8 @@ zabbix_export:
             key: publicpool.api.info.raw
           triggers:
             - uuid: 3a2d8d3f6a4f4d3e9b3a000000000705
-              expression: 'avg(/Template Public Pool API/publicpool.miners.total,2h)>20 and count(/Template Public Pool API/publicpool.miners.total,10m)>=5 and avg(/Template Public Pool API/publicpool.miners.total,5m)<avg(/Template Public Pool API/publicpool.miners.total,2h)*0.4'
-              name: 'Pool: total miners collapsed (>60% drop vs 2h average)'
+              expression: 'avg(/Template Public Pool API/publicpool.miners.total,{$DROP_BASELINE_WINDOW})>20 and count(/Template Public Pool API/publicpool.miners.total,10m)>=5 and avg(/Template Public Pool API/publicpool.miners.total,5m)<avg(/Template Public Pool API/publicpool.miners.total,{$DROP_BASELINE_WINDOW})*(100-{$MINERS_COLLAPSE_THRESHOLD_PCT})/100'
+              name: 'Pool: total miners collapsed (>{$MINERS_COLLAPSE_THRESHOLD_PCT}% drop vs {$DROP_BASELINE_WINDOW} average)'
               priority: HIGH
             - uuid: 3a2d8d3f6a4f4d3e9b3a000000000704
               expression: 'count(/Template Public Pool API/publicpool.miners.total,10m)>=5 and avg(/Template Public Pool API/publicpool.miners.total,5m)<avg(/Template Public Pool API/publicpool.miners.total,{$DROP_BASELINE_WINDOW})*(100-{$MINERS_DROP_THRESHOLD_PCT})/100'
@@ -420,6 +420,8 @@ zabbix_export:
           value: 10m
         - macro: '{$MINERS_DROP_THRESHOLD_PCT}'
           value: '30'
+        - macro: '{$MINERS_COLLAPSE_THRESHOLD_PCT}'
+          value: '60'
         - macro: '{$HASHRATE_DROP_THRESHOLD_PCT}'
           value: '5'
         - macro: '{$DROP_BASELINE_WINDOW}'
