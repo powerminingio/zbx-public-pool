@@ -1,185 +1,223 @@
-# Zabbix Template -- Public Pool API
+# Zabbix Template — Public Pool API
 
-This template monitors a **public-pool backend** (as used by
-`public-pool` / `public-pool-ui`) via its HTTP API and provides:
+This template monitors a **public-pool backend** used by
+`public-pool` / `public-pool-ui` through its HTTP API and provides:
 
--   Pool health & activity metrics
--   Bitcoin network sanity checks
--   Pool hashrate monitoring & stagnation detection
--   Expected time-to-find-block visualization (years + days)
--   Practical, low-noise triggers for real failure modes
+- Pool health and activity metrics
+- Automatic per-`userAgent` monitoring
+- Bitcoin network sanity checks
+- Pool hashrate monitoring and stagnation detection
+- Expected time-to-find-block visualization
+- Configurable, low-noise triggers for operational failures
 
 The template is designed and tested for **Zabbix 7.4**.
 
-------------------------------------------------------------------------
+---
 
 ## Monitored API Endpoints
 
 The template uses HTTP Agent items to poll:
 
-  Endpoint            Purpose
-  ------------------- -----------------------------------------------------
-  `/api/info`         Pool state, miners, user agents, uptime, highscores
-  `/api/network`      Bitcoin network state from bitcoind
-  `/api/info/chart`   Pool hashrate time series
+| Endpoint | Purpose |
+|---|---|
+| `/api/info` | Pool state, miners, user agents, uptime, and highscores |
+| `/api/network` | Bitcoin network state from bitcoind |
+| `/api/info/chart` | Pool hashrate time series |
 
-All other metrics are derived from these endpoints using **dependent**
-and **calculated** items to minimize HTTP load.
+All other metrics are derived using **dependent**, **calculated**, and
+**low-level discovery** items to minimize HTTP load.
 
-------------------------------------------------------------------------
+---
 
 ## Template Macros
 
-  -------------------------------------------------------------------------------------------
-  Macro                              Default                   Description
-  ---------------------------------- ------------------------- ------------------------------
-  `{$API_URL}`                       `http://localhost:3334`   Base URL of public-pool
-                                                               backend
+| Macro | Default | Description |
+|---|---:|---|
+| `{$API_URL}` | `http://localhost:3334` | Base URL of the public-pool backend |
+| `{$CHAIN_EXPECTED}` | `main` | Expected Bitcoin chain, such as `main`, `test`, or `regtest` |
+| `{$NODATA}` | `10m` | General no-data interval used by applicable availability checks |
+| `{$HASHRATE_FLAT_THRESHOLD_REL}` | `0.03` | Relative hashrate variation threshold; `0.03` means 3% |
+| `{$HASHRATE_FLAT_THRESHOLD_ABS}` | `100000000` | Absolute minimum hashrate variation threshold in H/s; default is 100 MH/s |
+| `{$MINERS_DROP_THRESHOLD_PCT}` | `30` | Miner-count drop percentage required to trigger the relative drop alert |
+| `{$HASHRATE_DROP_THRESHOLD_PCT}` | `5` | Pool-hashrate drop percentage required to trigger the relative drop alert |
+| `{$DROP_BASELINE_WINDOW}` | `2h` | Shared historical baseline window used by the miner-count and hashrate drop triggers |
 
-  `{$CHAIN_EXPECTED}`                `main`                    Expected Bitcoin chain
-                                                               (`main`, `test`, `regtest`,
-                                                               etc.)
+Macros can be overridden per host without changing the template.
 
-  `{$HASHRATE_FLAT_THRESHOLD_REL}`   `0.03`                    Relative change threshold (3%)
-                                                               for hashrate stagnation
-                                                               detection
+### Relative drop detection
 
-  `{$HASHRATE_FLAT_THRESHOLD_ABS}`   `100000000`               Absolute H/s delta override
-                                                               for stagnation detection
-  -------------------------------------------------------------------------------------------
+The miner-count and total-hashrate drop triggers compare a recent
+5-minute average against the average over `{$DROP_BASELINE_WINDOW}`.
 
-### Hashrate Flat Detection Logic
+Default behavior:
 
-The template detects when pool hashrate is **not changing
-meaningfully**, which can indicate:
+- Miner-count alert: more than **30%** below the **2-hour** baseline
+- Hashrate alert: more than **5%** below the **2-hour** baseline
 
--   Backend freeze
--   Stuck chart updates
--   Broken API responses
--   Constant synthetic values
+For example, changing:
 
-The trigger fires when:
+```text
+{$DROP_BASELINE_WINDOW} = 4h
+{$HASHRATE_DROP_THRESHOLD_PCT} = 10
+```
 
--   Relative change is below `{$HASHRATE_FLAT_THRESHOLD_REL}`
--   AND absolute change is below `{$HASHRATE_FLAT_THRESHOLD_ABS}`
+makes the hashrate trigger alert when the recent value is more than 10%
+below its 4-hour average.
 
-This dual threshold prevents false positives on: - Small pools (low
-absolute variation) - Very large pools (low relative noise)
+### Hashrate stagnation detection
 
-------------------------------------------------------------------------
+The template also detects when the hashrate series is not changing
+meaningfully over its observation window.
+
+The effective flatness threshold is the larger of:
+
+```text
+average hashrate × {$HASHRATE_FLAT_THRESHOLD_REL}
+```
+
+and:
+
+```text
+{$HASHRATE_FLAT_THRESHOLD_ABS}
+```
+
+With the defaults, variation must exceed both the practical 100 MH/s
+floor and, for sufficiently large pools, 3% of the average hashrate.
+
+To force a strictly absolute threshold for a host, set:
+
+```text
+{$HASHRATE_FLAT_THRESHOLD_REL} = 0
+{$HASHRATE_FLAT_THRESHOLD_ABS} = <desired threshold in H/s>
+```
+
+---
 
 ## Collected Metrics
 
-### Pool Activity
+### Pool activity
 
--   Total miners (sum of all `userAgents[].count`)
--   Total pool hashrate (raw H/s)
--   Converted pool hashrate (PH/s)
--   Pool uptime start timestamp (restart detection)
--   Latest highscore update timestamp (extracted from array)
+- Total connected miners, summed across all `userAgents`
+- Total pool hashrate in H/s
+- Converted pool hashrate in PH/s
+- Pool uptime start timestamp
+- Latest highscore update timestamp
 
-------------------------------------------------------------------------
+The highscore timestamp is collected for visibility only. The template
+does not alert on highscore inactivity because `/api/info` returns only
+the top entries and long-running pools may legitimately have no changes
+for extended periods.
 
-### Bitcoin Network
+### Per-user-agent metrics
 
--   Block height
--   Difficulty
--   Network hashrate (`networkhashps`)
--   Mempool transaction count
--   Chain name
--   bitcoind warnings count
+A low-level discovery rule automatically discovers every distinct
+`userAgent` returned by `/api/info`.
 
-------------------------------------------------------------------------
+For each discovered user agent, the template creates items for:
 
-### Pool Hashrate Chart
+- Connected miner count
+- Total hashrate
+- Best difficulty
+
+The discovery is not based on a hardcoded list. New user-agent values
+are added automatically, and the discovery and item prototypes reuse
+the existing `/api/info` master item without additional HTTP requests.
+
+### Bitcoin network
+
+- Block height
+- Difficulty
+- Network hashrate (`networkhashps`)
+- Mempool transaction count
+- Chain name
+- bitcoind warning count
+
+### Pool hashrate chart
 
 From `/api/info/chart`:
 
--   Latest hashrate value (H/s)
--   Latest timestamp (epoch)
--   Converted PH/s value
+- Latest hashrate value in H/s
+- Latest data-point timestamp
+- Converted hashrate in PH/s
 
-------------------------------------------------------------------------
+### Calculated metrics
 
-### Calculated Metrics
+- Effective hashrate-flatness threshold in H/s
+- Expected time to find a Bitcoin block in years
+- Expected time to find a Bitcoin block in days
 
--   **Expected time to find a Bitcoin block (years)**
--   **Expected time to find a Bitcoin block (days)**
-
-The dual units allow flexible graphing and alerting.
-
-------------------------------------------------------------------------
+---
 
 ## Graphs
 
 ### Public-Pool Hashrate + Expected Time
 
-Single graph with dual Y-axes:
+A single graph with two Y-axes:
 
--   **Left axis:** Pool hashrate (PH/s)
--   **Right axis:** Expected time to find a block (years)
+- **Left axis:** Pool hashrate in PH/s
+- **Right axis:** Expected time to find a block in years
 
-This mirrors the semantics of the public-pool UI while keeping
-operational visibility in Zabbix.
+This mirrors the semantics of the public-pool UI while retaining the
+data in Zabbix.
 
-------------------------------------------------------------------------
+---
 
-## Triggers (Alerting)
+## Triggers
 
-### API Availability
+### API availability
 
--   **/api/info unreachable or no data for 10m**
--   **/api/network unreachable or no data for 15m**
+- `/api/info` unreachable or no data for 10 minutes
+- `/api/network` unreachable or no data for 15 minutes
 
-------------------------------------------------------------------------
+### Pool health
 
-### Pool Health
+- Hashrate not changing beyond the configured relative/absolute threshold
+- Total miners dropped by more than `{$MINERS_DROP_THRESHOLD_PCT}` percent versus the `{$DROP_BASELINE_WINDOW}` average
+- Total miners collapsed by more than 60% versus the 2-hour average, with a minimum-baseline guard
+- Total hashrate dropped by more than `{$HASHRATE_DROP_THRESHOLD_PCT}` percent versus the `{$DROP_BASELINE_WINDOW}` average
+- Backend restarted within the last 10 minutes
 
--   **Hashrate not changing (relative + absolute threshold guarded)**
--   **Total miners dropped \>30% vs 1h average**
--   **Total miners collapsed (\>60% vs 2h average)**
--   **Total hashrate dropped \>40% vs 2h average**
--   **Backend restarted within last 10 minutes**
+### Bitcoin network sanity
 
-------------------------------------------------------------------------
+- Chain mismatch, controlled by `{$CHAIN_EXPECTED}`
+- bitcoind warnings present
+- Block height not advancing for 2 hours
 
-### Bitcoin Network Sanity
-
--   **Chain mismatch** (controlled via `{$CHAIN_EXPECTED}`)
--   **bitcoind warnings present**
--   **Block height not advancing for 2 hours**
-
-------------------------------------------------------------------------
+---
 
 ## Installation
 
-1.  Import the template YAML into Zabbix:\
-    `Configuration → Templates → Import`
+1. Import the template YAML in Zabbix:
 
-2.  Create or select a host and link **Template Public Pool API**
+   ```text
+   Data collection → Templates → Import
+   ```
 
-3.  Set required macros on the host if needed
+2. Create or select a host and link **Template Public Pool API**.
 
-4.  Ensure the Zabbix server or proxy can reach the API endpoint
+3. Override macros on the host when required.
 
-No Zabbix agent is required on the pool host.
+4. Ensure the Zabbix server or proxy can reach `{$API_URL}`.
 
-------------------------------------------------------------------------
+No Zabbix agent is required on the pool host for these HTTP checks.
+
+---
 
 ## Design Principles
 
--   Uses **dependent items** to minimize HTTP load
--   Uses **relative thresholds** to avoid alert noise
--   Uses **guarded collapse detection** to prevent false positives
--   YAML structure matches **Zabbix 7.4 import schema**
--   Avoids overly aggressive freshness triggers on chart data
+- Reuses HTTP master items through dependent items and LLD
+- Discovers user-agent categories automatically
+- Uses configurable percentage thresholds instead of fixed values
+- Uses one shared, configurable baseline window for related drop checks
+- Uses guarded comparisons to reduce short-term alert noise
+- Avoids unreliable highscore-inactivity and overly aggressive chart-freshness alerts
+- Follows the Zabbix 7.4 YAML import structure
 
-------------------------------------------------------------------------
+---
 
 ## Future Extensions
 
--   User-agent LLD
--   Trigger prototypes per miner type
--   Dashboard widgets
--   Additional expected-time units (months, weeks)
--   SLA-style availability metrics
+- Trigger prototypes for selected user-agent categories
+- Dashboard widgets
+- Additional expected-time units such as months or weeks
+- SLA-style availability metrics
